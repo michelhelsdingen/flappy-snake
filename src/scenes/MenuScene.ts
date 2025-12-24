@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import { GAME } from '../utils/constants';
+import { soundManager } from '../utils/sounds';
 
 export class MenuScene extends Phaser.Scene {
   private highScore: number = 0;
+  private playerName: string = '';
+  private nameInput!: HTMLInputElement;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -10,6 +13,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     this.highScore = parseInt(localStorage.getItem('flappySnakeHighScore') || '0');
+    this.playerName = localStorage.getItem('flappySnakePlayerName') || '';
 
     // Starfield background
     for (let i = 0; i < 50; i++) {
@@ -29,8 +33,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     // Title with glow effect
-    const title = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 3, 'FLAPPY\nSNAKE', {
-      fontSize: '48px',
+    const title = this.add.text(GAME.WIDTH / 2, 80, 'FLAPPY\nSNAKE', {
+      fontSize: '42px',
       fontFamily: 'Arial Black, Arial',
       color: '#00ffcc',
       align: 'center',
@@ -38,25 +42,42 @@ export class MenuScene extends Phaser.Scene {
     title.setOrigin(0.5);
     title.setShadow(0, 0, '#00ffcc', 15, true, true);
 
-    // Tap to start (blinking)
-    const startText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 50, 'TAP TO START', {
-      fontSize: '20px',
+    // Name input label
+    this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 - 60, 'ENTER YOUR NAME:', {
+      fontSize: '16px',
       fontFamily: 'Arial',
-      color: '#ffffff',
-    });
-    startText.setOrigin(0.5);
+      color: '#888888',
+    }).setOrigin(0.5);
 
-    this.tweens.add({
-      targets: startText,
-      alpha: 0.2,
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
+    // Create HTML input for name
+    this.createNameInput();
+
+    // Start button
+    const startButton = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 60, 'START GAME', {
+      fontSize: '24px',
+      fontFamily: 'Arial Black, Arial',
+      color: '#00ffcc',
+      backgroundColor: '#1a1a2e',
+      padding: { x: 20, y: 10 },
+    });
+    startButton.setOrigin(0.5);
+    startButton.setInteractive({ useHandCursor: true });
+
+    startButton.on('pointerover', () => {
+      startButton.setColor('#ffffff');
+    });
+
+    startButton.on('pointerout', () => {
+      startButton.setColor('#00ffcc');
+    });
+
+    startButton.on('pointerdown', () => {
+      this.startGame();
     });
 
     // High score
     if (this.highScore > 0) {
-      const highScoreText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT * 0.75, `BEST: ${this.highScore}`, {
+      const highScoreText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 80, `BEST: ${this.highScore}`, {
         fontSize: '18px',
         fontFamily: 'Arial',
         color: '#888888',
@@ -64,9 +85,72 @@ export class MenuScene extends Phaser.Scene {
       highScoreText.setOrigin(0.5);
     }
 
-    // Input
-    this.input.on('pointerdown', () => {
-      this.scene.start('GameScene');
+    // Cleanup on scene shutdown
+    this.events.on('shutdown', () => {
+      if (this.nameInput) {
+        this.nameInput.remove();
+      }
     });
+  }
+
+  private createNameInput(): void {
+    // Get canvas position
+    const canvas = this.game.canvas;
+    const canvasRect = canvas.getBoundingClientRect();
+
+    // Calculate position relative to canvas
+    const scaleX = canvasRect.width / GAME.WIDTH;
+    const scaleY = canvasRect.height / GAME.HEIGHT;
+    const inputX = canvasRect.left + (GAME.WIDTH / 2) * scaleX;
+    const inputY = canvasRect.top + (GAME.HEIGHT / 2 - 10) * scaleY;
+
+    // Create input element
+    this.nameInput = document.createElement('input');
+    this.nameInput.type = 'text';
+    this.nameInput.placeholder = 'Your name...';
+    this.nameInput.value = this.playerName;
+    this.nameInput.maxLength = 15;
+    this.nameInput.style.cssText = `
+      position: absolute;
+      left: ${inputX}px;
+      top: ${inputY}px;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      padding: 10px 15px;
+      font-size: 18px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      border: 2px solid #00ffcc;
+      border-radius: 8px;
+      background: #1a1a2e;
+      color: #ffffff;
+      outline: none;
+      text-transform: uppercase;
+    `;
+
+    this.nameInput.addEventListener('focus', () => {
+      this.nameInput.style.borderColor = '#ff00ff';
+    });
+
+    this.nameInput.addEventListener('blur', () => {
+      this.nameInput.style.borderColor = '#00ffcc';
+    });
+
+    this.nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        this.startGame();
+      }
+    });
+
+    document.body.appendChild(this.nameInput);
+  }
+
+  private startGame(): void {
+    const name = this.nameInput.value.trim().toUpperCase() || 'SPELER';
+    localStorage.setItem('flappySnakePlayerName', name);
+
+    soundManager.resume();
+    this.nameInput.remove();
+    this.scene.start('GameScene', { playerName: name });
   }
 }

@@ -11,9 +11,41 @@ export class GameScene extends Phaser.Scene {
   private snake!: Snake;
   private pipes: Pipe[] = [];
   private pipeTimer!: Phaser.Time.TimerEvent;
+  private playerName: string = 'SPELER';
+
+  private readonly insultTemplates: string[] = [
+    '{NAME} IS GAY',
+    '{NAME} IS HOMO',
+    '{NAME} IS EEN SUKKEL',
+    '{NAME} IS EEN TRUT',
+    '{NAME} RUIKT NAAR KAAS',
+    '{NAME} HEEFT GEEN VRIENDEN',
+    '{NAME} IS EEN LOSER',
+    '{NAME} WOONT NOG BIJ MAMA',
+    '{NAME} KAN NIET FIETSEN',
+    '{NAME} DRAAGT CROCS',
+    '{NAME} IS BANGER DAN JIJ',
+    '{NAME} SNURKT',
+    '{NAME} HEEFT EEN NOKIA',
+    '{NAME} EET ANANAS OP PIZZA',
+    '{NAME} IS ALTIJD TE LAAT',
+    '{NAME} LIEGT OVER ZIJN LENGTE',
+    '{NAME} KIJKT TEMPTATION ISLAND',
+    '{NAME} ZEGT "CIAO" BIJ HET AFSCHEID',
+    '{NAME} HEEFT GEEN RIZZ',
+    '{NAME} IS NPC ENERGY',
+    '{NAME} SKIPT LEG DAY',
+    '{NAME} DRINKT MELK MET IJS',
+    '{NAME} HEEFT EEN FIDGET SPINNER',
+    '{NAME} IS EEN MEME',
+  ];
 
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  init(data: { playerName?: string }): void {
+    this.playerName = data.playerName || localStorage.getItem('flappySnakePlayerName') || 'SPELER';
   }
 
   create(): void {
@@ -217,6 +249,55 @@ export class GameScene extends Phaser.Scene {
       scaleY: 1.3,
       duration: 100,
       yoyo: true,
+    });
+
+    // Insult every 10 points
+    if (this.score % 10 === 0) {
+      this.showInsult();
+    }
+  }
+
+  private showInsult(): void {
+    const template = Phaser.Math.RND.pick(this.insultTemplates);
+    const insult = template.replace('{NAME}', this.playerName);
+
+    const insultText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, insult, {
+      fontSize: '24px',
+      fontFamily: 'Arial Black, Arial',
+      color: '#ff00ff',
+      stroke: '#000000',
+      strokeThickness: 4,
+      align: 'center',
+      wordWrap: { width: GAME.WIDTH - 40 },
+    });
+    insultText.setOrigin(0.5);
+    insultText.setDepth(200);
+    insultText.setAlpha(0);
+    insultText.setScale(0.5);
+    insultText.setRotation(Phaser.Math.FloatBetween(-0.1, 0.1));
+
+    // Animate in
+    this.tweens.add({
+      targets: insultText,
+      alpha: 1,
+      scale: 1.2,
+      duration: 150,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        // Hold and fade out
+        this.tweens.add({
+          targets: insultText,
+          alpha: 0,
+          y: insultText.y - 50,
+          scale: 1.5,
+          duration: 800,
+          delay: 1500,
+          ease: 'Power2',
+          onComplete: () => {
+            insultText.destroy();
+          },
+        });
+      },
     });
   }
 }

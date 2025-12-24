@@ -2,6 +2,7 @@
 export class SoundManager {
   private context: AudioContext | null = null;
   private enabled: boolean = true;
+  private unlocked: boolean = false;
 
   private getContext(): AudioContext {
     if (!this.context) {
@@ -10,10 +11,22 @@ export class SoundManager {
     return this.context;
   }
 
-  // Resume audio context (required for mobile after user interaction)
+  // Resume and unlock audio context (required for iOS)
   resume(): void {
-    if (this.context?.state === 'suspended') {
-      this.context.resume();
+    const ctx = this.getContext();
+
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // iOS requires playing a silent buffer to unlock audio
+    if (!this.unlocked) {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      this.unlocked = true;
     }
   }
 
