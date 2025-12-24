@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME, PHYSICS } from '../utils/constants';
 import { Snake } from '../entities/Snake';
 import { Pipe } from '../entities/Pipe';
+import { soundManager } from '../utils/sounds';
 
 export class GameScene extends Phaser.Scene {
   private score: number = 0;
@@ -72,10 +73,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleTap(): void {
+    soundManager.resume(); // Required for mobile audio
+
     if (this.isGameOver) {
       this.scene.restart();
       return;
     }
+    soundManager.playFlap();
     this.snake.flap();
   }
 
@@ -129,6 +133,9 @@ export class GameScene extends Phaser.Scene {
     // Screen shake
     this.cameras.main.shake(200, 0.02);
 
+    // Death sound
+    soundManager.playDeath();
+
     // Save high score
     const highScore = parseInt(localStorage.getItem('flappySnakeHighScore') || '0');
     const isNewBest = this.score > highScore;
@@ -159,6 +166,7 @@ export class GameScene extends Phaser.Scene {
     finalScore.setDepth(100);
 
     if (isNewBest && this.score > 0) {
+      soundManager.playNewBest();
       const newBestText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 35, 'NEW BEST!', {
         fontSize: '20px',
         fontFamily: 'Arial Black, Arial',
@@ -198,6 +206,9 @@ export class GameScene extends Phaser.Scene {
     this.score++;
     this.scoreText.setText(this.score.toString());
     this.snake.grow();
+
+    // Score sound
+    soundManager.playScore();
 
     // Score flash effect
     this.tweens.add({
