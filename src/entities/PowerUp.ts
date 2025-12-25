@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GAME } from '../utils/constants';
 
-export type PowerUpType = 'shield' | 'slowmo' | 'magnet' | 'ghost';
+export type PowerUpType = 'shield' | 'magnet' | 'ghost';
 
 interface PowerUpConfig {
   emoji: string;
@@ -11,7 +11,6 @@ interface PowerUpConfig {
 
 const POWER_UP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
   shield: { emoji: '🛡️', color: 0x00ffff, duration: 5000 },
-  slowmo: { emoji: '⏱️', color: 0xff00ff, duration: 4000 },
   magnet: { emoji: '🧲', color: 0xff6600, duration: 6000 },
   ghost: { emoji: '👻', color: 0xaaaaff, duration: 3000 },
 };

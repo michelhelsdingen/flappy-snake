@@ -38,7 +38,6 @@ export class GameScene extends Phaser.Scene {
   private hasShield: boolean = false;
   private shieldVisual: Phaser.GameObjects.Arc | null = null;
   private isInvincible: boolean = false;
-  private isSlowMo: boolean = false;
   private hasMagnet: boolean = false;
   private isGhostMode: boolean = false;
   private magnetRange: number = 150;
@@ -99,7 +98,6 @@ export class GameScene extends Phaser.Scene {
     this.powerUpEntities = [];
     this.hasShield = false;
     this.isInvincible = false;
-    this.isSlowMo = false;
     this.hasMagnet = false;
     this.isGhostMode = false;
     this.comboCount = 0;
@@ -375,7 +373,7 @@ export class GameScene extends Phaser.Scene {
     const x = GAME.WIDTH + 30;
     const y = Phaser.Math.Between(100, GAME.HEIGHT - 100);
 
-    const types: PowerUpType[] = ['shield', 'slowmo', 'magnet', 'ghost'];
+    const types: PowerUpType[] = ['shield', 'magnet', 'ghost'];
     const type = Phaser.Math.RND.pick(types);
 
     const powerUp = new PowerUp(this, x, y, type);
@@ -643,7 +641,6 @@ export class GameScene extends Phaser.Scene {
     // Show power-up text
     const powerUpNames: Record<PowerUpType, string> = {
       shield: '🛡️ SHIELD!',
-      slowmo: '⏱️ SLOW-MO!',
       magnet: '🧲 MAGNET!',
       ghost: '👻 GHOST!',
     };
@@ -679,9 +676,6 @@ export class GameScene extends Phaser.Scene {
       case 'shield':
         this.activateShield(duration);
         break;
-      case 'slowmo':
-        this.activateSlowMo(duration);
-        break;
       case 'magnet':
         this.activateMagnet(duration);
         break;
@@ -698,7 +692,6 @@ export class GameScene extends Phaser.Scene {
 
     const emojis: Record<PowerUpType, string> = {
       shield: '🛡️',
-      slowmo: '⏱️',
       magnet: '🧲',
       ghost: '👻',
     };
@@ -811,26 +804,6 @@ export class GameScene extends Phaser.Scene {
     // Check achievement
     const shieldAchievements = achievements.checkShieldSave();
     shieldAchievements.forEach(a => this.showAchievementPopup(a));
-  }
-
-  private activateSlowMo(duration: number): void {
-    this.isSlowMo = true;
-    this.currentScrollSpeed = PHYSICS.SCROLL_SPEED * 0.4;
-
-    // Visual effect - overlay with blue tint
-    const slowMoOverlay = this.add.rectangle(
-      GAME.WIDTH / 2, GAME.HEIGHT / 2,
-      GAME.WIDTH, GAME.HEIGHT,
-      0x8888ff, 0.15
-    );
-    slowMoOverlay.setDepth(50);
-
-    // Deactivate after duration
-    this.time.delayedCall(duration, () => {
-      this.isSlowMo = false;
-      this.currentScrollSpeed = PHYSICS.SCROLL_SPEED;
-      slowMoOverlay.destroy();
-    });
   }
 
   private activateMagnet(duration: number): void {
@@ -990,7 +963,6 @@ export class GameScene extends Phaser.Scene {
     // Clear power-ups
     this.hasShield = false;
     this.isInvincible = false;
-    this.isSlowMo = false;
     this.hasMagnet = false;
     if (this.shieldVisual) {
       this.shieldVisual.destroy();
