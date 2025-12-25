@@ -10,6 +10,7 @@ import { haptics } from '../utils/haptics';
 import { achievements, Achievement } from '../utils/achievements';
 import { addScore, getLeaderboard, getHighScore, fetchLeaderboard } from '../utils/leaderboard';
 import { skinManager } from '../utils/skins';
+import { presenceManager, ActivePlayer } from '../utils/presence';
 
 export class GameScene extends Phaser.Scene {
   private score: number = 0;
@@ -51,6 +52,10 @@ export class GameScene extends Phaser.Scene {
 
   // Stats tracking for skin unlocks
   private powerUpsCollected: number = 0;
+
+  // Live players display
+  private livePlayersContainer: Phaser.GameObjects.Container | null = null;
+  private unsubscribePresence: (() => void) | null = null;
 
   private readonly motivationTemplates: string[] = [
     'BIJNA {NAME}! VOLGENDE KEER BETER!',
@@ -194,6 +199,12 @@ export class GameScene extends Phaser.Scene {
 
     // First pipe after short delay
     this.time.delayedCall(1000, this.spawnPipe, [], this);
+
+    // Start presence tracking
+    presenceManager.start(this.playerName, this.playerAvatar);
+    this.unsubscribePresence = presenceManager.subscribe((players) => {
+      this.updateLivePlayersDisplay(players);
+    });
 
     // Input
     this.input.on('pointerdown', this.handleTap, this);
@@ -960,6 +971,13 @@ export class GameScene extends Phaser.Scene {
     this.giftTimer.destroy();
     this.powerUpTimer.destroy();
 
+    // Stop presence tracking
+    if (this.unsubscribePresence) {
+      this.unsubscribePresence();
+      this.unsubscribePresence = null;
+    }
+    presenceManager.stop();
+
     // Clear power-ups
     this.hasShield = false;
     this.isInvincible = false;
@@ -1198,6 +1216,9 @@ export class GameScene extends Phaser.Scene {
     this.score++;
     this.scoreText.setText(this.score.toString());
 
+    // Update presence with new score
+    presenceManager.updateScore(this.score);
+
     // Score sound and haptics
     soundManager.playScore();
     haptics.success();
@@ -1313,5 +1334,81 @@ export class GameScene extends Phaser.Scene {
         });
       },
     });
+  }
+
+  private updateLivePlayersDisplay(players: ActivePlayer[]): void {
+    // Clear existing display
+    if (this.livePlayersContainer) {
+      this.livePlayersContainer.destroy();
+    }
+
+    if (players.length === 0) return;
+
+    this.livePlayersContainer = this.add.container(10, 80);
+    this.livePlayersContainer.setDepth(100);
+
+    // Header
+    const header = this.add.text(0, 0, '🎮 LIVE', {
+      fontSize: '10px',
+      fontFamily: 'Arial',
+      color: '#00ff00',
+    });
+    this.livePlayersContainer.add(header);
+
+    // Pulsing live indicator
+    const liveIndicator = this.add.circle(42, 5, 3, 0x00ff00);
+    this.livePlayersContainer.add(liveIndicator);
+    this.tweens.add({
+      targets: liveIndicator,
+      alpha: 0.3,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Show up to 4 other players
+    const displayPlayers = players.slice(0, 4);
+    displayPlayers.forEach((player, index) => {
+      const y = 18 + index * 20;
+
+      // Player row container
+      const rowContainer = this.add.container(0, y);
+
+      // Avatar
+      const avatar = this.add.text(0, 0, player.avatar, { fontSize: '12px' });
+      avatar.setOrigin(0, 0.5);
+      rowContainer.add(avatar);
+
+      // Name (truncated)
+      const displayName = player.name.length > 6 ? player.name.substring(0, 6) : player.name;
+      const name = this.add.text(18, 0, displayName, {
+        fontSize: '10px',
+        fontFamily: 'Arial',
+        color: '#ffffff',
+      });
+      name.setOrigin(0, 0.5);
+      rowContainer.add(name);
+
+      // Score
+      const score = this.add.text(60, 0, player.score.toString(), {
+        fontSize: '10px',
+        fontFamily: 'Arial',
+        color: '#00ffcc',
+      });
+      score.setOrigin(0, 0.5);
+      rowContainer.add(score);
+
+      this.livePlayersContainer!.add(rowContainer);
+    });
+
+    // If more players, show count
+    if (players.length > 4) {
+      const moreText = this.add.text(0, 18 + 4 * 20, `+${players.length - 4} meer`, {
+        fontSize: '9px',
+        fontFamily: 'Arial',
+        color: '#888888',
+      });
+      this.livePlayersContainer.add(moreText);
+    }
   }
 }

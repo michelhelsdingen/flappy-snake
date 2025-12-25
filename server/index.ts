@@ -24,6 +24,26 @@ db.exec(`
 app.use(cors());
 app.use(express.json());
 
+// In-memory presence store (expires after 10 seconds)
+interface ActivePlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  lastSeen: number;
+}
+const activePlayers = new Map<string, ActivePlayer>();
+
+// Clean up stale players every 5 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, player] of activePlayers) {
+    if (now - player.lastSeen > 10000) {
+      activePlayers.delete(id);
+    }
+  }
+}, 5000);
+
 // Get leaderboard (top 10)
 app.get('/api/leaderboard', (req, res) => {
   const scores = db.prepare(`
@@ -72,6 +92,39 @@ app.get('/api/highscore', (req, res) => {
 app.delete('/api/scores', (req, res) => {
   db.prepare('DELETE FROM scores').run();
   res.json({ message: 'All scores cleared' });
+});
+
+// --- PRESENCE ENDPOINTS ---
+
+// Get active players
+app.get('/api/presence', (req, res) => {
+  const players = Array.from(activePlayers.values());
+  res.json(players);
+});
+
+// Send heartbeat (update presence)
+app.post('/api/presence', (req, res) => {
+  const { id, name, avatar, score } = req.body;
+
+  if (!id || !name) {
+    return res.status(400).json({ error: 'id and name are required' });
+  }
+
+  activePlayers.set(id, {
+    id,
+    name,
+    avatar: avatar || '🐍',
+    score: score || 0,
+    lastSeen: Date.now(),
+  });
+
+  res.json({ success: true });
+});
+
+// Remove presence
+app.delete('/api/presence/:id', (req, res) => {
+  activePlayers.delete(req.params.id);
+  res.json({ success: true });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
