@@ -587,6 +587,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private collectCoin(value: number): void {
+    const previousCoins = this.coins;
     this.coins += value;
     this.coinText.setText(this.coins.toString());
 
@@ -601,12 +602,46 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
     });
 
+    // Check if we crossed a 10-coin threshold for bonus score
+    const previousTens = Math.floor(previousCoins / 10);
+    const currentTens = Math.floor(this.coins / 10);
+    if (currentTens > previousTens) {
+      const bonusPoints = currentTens - previousTens;
+      for (let i = 0; i < bonusPoints; i++) {
+        this.incrementScore();
+      }
+      this.showCoinBonusPopup(bonusPoints);
+    }
+
     // Check achievements
     const coinAchievements = achievements.checkCoins(this.coins);
     coinAchievements.forEach(a => this.showAchievementPopup(a));
   }
 
+  private showCoinBonusPopup(points: number): void {
+    const bonusText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, `🪙 +${points} BONUS! 🪙`, {
+      fontSize: '24px',
+      fontFamily: 'Arial Black, Arial',
+      color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 3,
+    });
+    bonusText.setOrigin(0.5);
+    bonusText.setDepth(200);
+
+    this.tweens.add({
+      targets: bonusText,
+      y: bonusText.y - 60,
+      alpha: 0,
+      scale: 1.3,
+      duration: 800,
+      ease: 'Quad.easeOut',
+      onComplete: () => bonusText.destroy(),
+    });
+  }
+
   private collectGift(value: number): void {
+    const previousCoins = this.coins;
     this.coins += value;
     this.coinText.setText(this.coins.toString());
 
@@ -645,6 +680,17 @@ export class GameScene extends Phaser.Scene {
 
     // Camera flash with Christmas colors
     this.cameras.main.flash(150, 255, 215, 0, true);
+
+    // Check if we crossed a 10-coin threshold for bonus score
+    const previousTens = Math.floor(previousCoins / 10);
+    const currentTens = Math.floor(this.coins / 10);
+    if (currentTens > previousTens) {
+      const bonusPoints = currentTens - previousTens;
+      for (let i = 0; i < bonusPoints; i++) {
+        this.incrementScore();
+      }
+      this.showCoinBonusPopup(bonusPoints);
+    }
 
     // Check achievements
     const coinAchievements = achievements.checkCoins(this.coins);
