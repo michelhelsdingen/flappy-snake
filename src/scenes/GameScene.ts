@@ -1110,8 +1110,19 @@ export class GameScene extends Phaser.Scene {
 
     // Score with avatar
     const scoreContainer = this.add.container(GAME.WIDTH / 2, statsY);
-    const avatarText = this.add.text(-70, 0, this.playerAvatar, { fontSize: '32px' });
-    avatarText.setOrigin(0.5);
+
+    // Use Nyan Cat sprite if that skin is selected
+    const selectedSkin = skinManager.getSelectedSkin();
+    let avatarDisplay: Phaser.GameObjects.Text | Phaser.GameObjects.Image;
+    if (selectedSkin.id === 'nyancat' && this.textures.exists('nyancat')) {
+      avatarDisplay = this.add.image(-70, 0, 'nyancat');
+      avatarDisplay.setScale(0.15);
+      avatarDisplay.setOrigin(0.5);
+    } else {
+      avatarDisplay = this.add.text(-70, 0, this.playerAvatar, { fontSize: '32px' });
+      avatarDisplay.setOrigin(0.5);
+    }
+
     const finalScore = this.add.text(-30, 0, `${this.score}`, {
       fontSize: '32px',
       fontFamily: 'Arial Black, Arial',
@@ -1129,7 +1140,7 @@ export class GameScene extends Phaser.Scene {
     });
     coinCount.setOrigin(0, 0.5);
 
-    scoreContainer.add([avatarText, finalScore, coinEmoji, coinCount]);
+    scoreContainer.add([avatarDisplay, finalScore, coinEmoji, coinCount]);
     scoreContainer.setDepth(100);
 
     if (isNewBest && this.score > 0) {
@@ -1217,11 +1228,19 @@ export class GameScene extends Phaser.Scene {
         bar.setDepth(99);
       }
 
-      // Avatar
-      const avatar = this.add.text(GAME.WIDTH / 2 - 110, y, entry.avatar || '🐍', {
-        fontSize: '18px',
-      });
-      avatar.setOrigin(0.5);
+      // Avatar - use Nyan Cat sprite if applicable
+      let avatar: Phaser.GameObjects.Text | Phaser.GameObjects.Image;
+      const isNyanCatEntry = entry.avatar === '🍰' && this.textures.exists('nyancat');
+      if (isNyanCatEntry) {
+        avatar = this.add.image(GAME.WIDTH / 2 - 110, y, 'nyancat');
+        avatar.setScale(0.08);
+        avatar.setOrigin(0.5);
+      } else {
+        avatar = this.add.text(GAME.WIDTH / 2 - 110, y, entry.avatar || '🐍', {
+          fontSize: '18px',
+        });
+        avatar.setOrigin(0.5);
+      }
       avatar.setDepth(100);
 
       // Rank
