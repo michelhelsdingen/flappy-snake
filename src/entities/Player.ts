@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PHYSICS, GAME } from '../utils/constants';
+import { skinManager } from '../utils/skins';
 
 // Funny death messages
 const DEATH_MESSAGES = [
@@ -22,6 +23,7 @@ export class Player {
   private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter;
   private rainbowTrail: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private isRainbowMode: boolean = false;
+  private isNyanCat: boolean = false;
   private isGhostMode: boolean = false;
   private ghostOverlay: Phaser.GameObjects.Arc | null = null;
   private originalEmoji: string;
@@ -103,6 +105,32 @@ export class Player {
     rainbowGraphics.fillCircle(6, 6, 6);
     rainbowGraphics.generateTexture('rainbow', 12, 12);
     rainbowGraphics.destroy();
+
+    // Check if Nyan Cat skin - enable permanent rainbow trail
+    const selectedSkin = skinManager.getSelectedSkin();
+    if (selectedSkin.id === 'nyancat') {
+      this.isNyanCat = true;
+      this.enableNyanCatMode();
+    }
+  }
+
+  private enableNyanCatMode(): void {
+    // Create permanent rainbow trail for Nyan Cat
+    this.rainbowTrail = this.scene.add.particles(this.hitbox.x, this.hitbox.y, 'rainbow', {
+      speed: { min: 5, max: 15 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 1, end: 0.3 },
+      lifespan: 600,
+      frequency: 15,
+      blendMode: 'ADD',
+      follow: this.hitbox,
+      followOffset: { x: -25, y: 0 },
+      tint: [0xff0000, 0xff7700, 0xffff00, 0x00ff00, 0x0077ff, 0x9900ff],
+    });
+    this.rainbowTrail.setDepth(2);
+
+    // Make glow pink for Nyan Cat
+    this.glowCircle.setFillStyle(0xff77ff, 0.4);
   }
 
   flap(): void {
@@ -194,12 +222,18 @@ export class Player {
     if (!this.isRainbowMode) return;
     this.isRainbowMode = false;
 
-    if (this.rainbowTrail) {
+    // Don't remove rainbow trail if Nyan Cat (permanent rainbow)
+    if (this.rainbowTrail && !this.isNyanCat) {
       this.rainbowTrail.destroy();
       this.rainbowTrail = null;
     }
 
-    this.glowCircle.setFillStyle(0xff3333, 0.3);
+    // Restore glow color (pink for Nyan Cat, red for others)
+    if (this.isNyanCat) {
+      this.glowCircle.setFillStyle(0xff77ff, 0.4);
+    } else {
+      this.glowCircle.setFillStyle(0xff3333, 0.3);
+    }
   }
 
   // Ghost mode - can pass through pipes

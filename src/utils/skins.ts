@@ -149,13 +149,13 @@ export const SKINS: Skin[] = [
   // Special skins
   {
     id: 'nyancat',
-    emoji: '🐱',
+    emoji: '🍰',
     name: 'Nyan Cat',
-    description: 'Nyanyanyanya~',
+    description: 'Pop-Tart cat with rainbow trail!',
     unlockRequirement: 'Score 75+ in a single game',
     unlockCondition: (stats) => stats.highScore >= 75,
     glowColor: 0xff77ff,
-    trailColor: 0x00ffff,
+    trailColor: 0xff0000, // Rainbow effect handled separately
   },
 ];
 
