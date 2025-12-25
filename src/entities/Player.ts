@@ -126,21 +126,21 @@ export class Player {
   }
 
   private enableNyanCatMode(): void {
-    // Create permanent rainbow trail for Nyan Cat - horizontal stripes
+    // Create permanent rainbow trail for Nyan Cat
+    // Particles stay in place and fade out, creating a trail as cat moves
     const rainbowColors = [0xff0000, 0xff7700, 0xffff00, 0x00ff00, 0x0077ff, 0x9900ff];
 
     this.rainbowTrail = this.scene.add.particles(this.hitbox.x, this.hitbox.y, 'rainbow', {
-      speedX: { min: -80, max: -40 }, // Move left only (horizontal trail)
-      speedY: { min: -2, max: 2 }, // Tiny vertical variance for natural look
-      scale: { start: 0.5, end: 0.3 },
-      alpha: { start: 1, end: 0.5 },
-      lifespan: 500,
-      frequency: 8, // More frequent particles for solid trail
+      speed: 0, // Particles don't move - they stay where emitted
+      scale: { start: 0.6, end: 0.2 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 800, // How long the trail lingers
+      frequency: 15, // Emit every 15ms
       blendMode: 'ADD',
       follow: this.hitbox,
-      followOffset: { x: -25, y: 0 },
+      followOffset: { x: -20, y: 0 }, // Emit behind the cat
       tint: rainbowColors,
-      quantity: 2, // Multiple particles per emission
+      quantity: 3, // Multiple particles per emission for rainbow effect
     });
     this.rainbowTrail.setDepth(2);
 
