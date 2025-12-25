@@ -6,8 +6,8 @@ export interface LeaderboardEntry {
   created_at?: string;
 }
 
-// API base URL - same host, different port
-const API_URL = `http://${window.location.hostname}:3001/api`;
+// Cloudflare Worker API URL
+const API_URL = 'https://flappy-snake-api.michel-91a.workers.dev/api';
 
 // Cache for leaderboard data
 let cachedLeaderboard: LeaderboardEntry[] = [];
@@ -56,7 +56,7 @@ export async function addScoreAsync(name: string, score: number, avatar: string 
 }
 
 // Sync wrapper for backward compatibility
-export function addScore(name: string, score: number, avatar: string = '��'): number {
+export function addScore(name: string, score: number, avatar: string = '🐍'): number {
   // Fire and forget - the async version will update the cache
   addScoreAsync(name, score, avatar);
 
