@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME } from '../utils/constants';
 import { soundManager } from '../utils/sounds';
 import { getLeaderboard, initLeaderboard } from '../utils/leaderboard';
+import { version } from '../../package.json';
 
 const AVATARS = ['🎅', '🎄', '⛄', '🦌', '🎁', '❄️', '🔔', '⭐', '🕯️', '🧦'];
 
@@ -106,6 +107,14 @@ export class MenuScene extends Phaser.Scene {
 
     // Leaderboard
     this.showLeaderboard();
+
+    // Version number in bottom right
+    const versionText = this.add.text(GAME.WIDTH - 10, GAME.HEIGHT - 10, `v${version}`, {
+      fontSize: '12px',
+      fontFamily: 'Arial',
+      color: '#555555',
+    });
+    versionText.setOrigin(1, 1);
 
     // Cleanup on scene shutdown
     this.events.on('shutdown', () => {
