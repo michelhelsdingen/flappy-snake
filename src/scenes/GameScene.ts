@@ -43,31 +43,31 @@ export class GameScene extends Phaser.Scene {
   private powerUpIndicators: Map<PowerUpType, Phaser.GameObjects.Container> = new Map();
   private currentScrollSpeed: number = PHYSICS.SCROLL_SPEED;
 
-  private readonly insultTemplates: string[] = [
-    '{NAME} IS GAY',
-    '{NAME} IS HOMO',
-    '{NAME} IS EEN SUKKEL',
-    '{NAME} IS EEN TRUT',
-    '{NAME} RUIKT NAAR KAAS',
-    '{NAME} HEEFT GEEN VRIENDEN',
-    '{NAME} IS EEN LOSER',
-    '{NAME} WOONT NOG BIJ MAMA',
-    '{NAME} KAN NIET FIETSEN',
-    '{NAME} DRAAGT CROCS',
-    '{NAME} IS BANGER DAN JIJ',
-    '{NAME} SNURKT',
-    '{NAME} HEEFT EEN NOKIA',
-    '{NAME} EET ANANAS OP PIZZA',
-    '{NAME} IS ALTIJD TE LAAT',
-    '{NAME} LIEGT OVER ZIJN LENGTE',
-    '{NAME} KIJKT TEMPTATION ISLAND',
-    '{NAME} ZEGT "CIAO" BIJ HET AFSCHEID',
-    '{NAME} HEEFT GEEN RIZZ',
-    '{NAME} IS NPC ENERGY',
-    '{NAME} SKIPT LEG DAY',
-    '{NAME} DRINKT MELK MET IJS',
-    '{NAME} HEEFT EEN FIDGET SPINNER',
-    '{NAME} IS EEN MEME',
+  private readonly motivationTemplates: string[] = [
+    'BIJNA {NAME}! VOLGENDE KEER BETER!',
+    'JE BENT GOED BEZIG {NAME}!',
+    '{NAME} GEEFT NOOIT OP!',
+    'DAT WAS DICHTBIJ {NAME}!',
+    'KEEP GOING {NAME}!',
+    '{NAME} IS EEN HELD!',
+    'NICE TRY {NAME}!',
+    '{NAME} KAN DIT!',
+    'JE GROEIT {NAME}!',
+    'OEFENING BAART KUNST {NAME}!',
+    '{NAME} GAAT DIT HALEN!',
+    'NIET OPGEVEN {NAME}!',
+    'TOP SCORE KOMT ERAAN {NAME}!',
+    '{NAME} IS ON FIRE!',
+    'GEWELDIGE POGING {NAME}!',
+    '{NAME} WORDT STEEDS BETER!',
+    'DAT WAS SICK {NAME}!',
+    'GO {NAME} GO!',
+    '{NAME} IS EEN LEGEND!',
+    'NEXT LEVEL {NAME}!',
+    '{NAME} MAAKT PROGRESS!',
+    'LEKKER BEZIG {NAME}!',
+    '{NAME} IS UNSTOPPABLE!',
+    'YOU GOT THIS {NAME}!',
   ];
 
   constructor() {
@@ -1126,35 +1126,35 @@ export class GameScene extends Phaser.Scene {
     const scoreAchievements = achievements.checkScore(this.score, this.previousHighScore);
     scoreAchievements.forEach(a => this.showAchievementPopup(a));
 
-    // Insult every 10 points
+    // Motivation every 10 points
     if (this.score % 10 === 0) {
-      this.showInsult();
+      this.showMotivation();
     }
   }
 
-  private showInsult(): void {
-    const template = Phaser.Math.RND.pick(this.insultTemplates);
-    const insult = template.replace('{NAME}', this.playerName);
+  private showMotivation(): void {
+    const template = Phaser.Math.RND.pick(this.motivationTemplates);
+    const motivation = template.replace('{NAME}', this.playerName);
 
-    const insultText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, insult, {
+    const motivationText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, motivation, {
       fontSize: '24px',
       fontFamily: 'Arial Black, Arial',
-      color: '#ff00ff',
+      color: '#00ff88',
       stroke: '#000000',
       strokeThickness: 4,
       align: 'center',
       wordWrap: { width: GAME.WIDTH - 40 },
     });
-    insultText.setOrigin(0.5);
-    insultText.setDepth(200);
-    insultText.setAlpha(0);
-    insultText.setScale(0.5);
-    insultText.setRotation(Phaser.Math.FloatBetween(-0.1, 0.1));
-    insultText.setShadow(0, 0, '#ff00ff', 10, true, true);
+    motivationText.setOrigin(0.5);
+    motivationText.setDepth(200);
+    motivationText.setAlpha(0);
+    motivationText.setScale(0.5);
+    motivationText.setRotation(Phaser.Math.FloatBetween(-0.1, 0.1));
+    motivationText.setShadow(0, 0, '#00ff88', 10, true, true);
 
     // Animate in
     this.tweens.add({
-      targets: insultText,
+      targets: motivationText,
       alpha: 1,
       scale: 1.2,
       duration: 150,
@@ -1162,15 +1162,15 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => {
         // Hold and fade out
         this.tweens.add({
-          targets: insultText,
+          targets: motivationText,
           alpha: 0,
-          y: insultText.y - 50,
+          y: motivationText.y - 50,
           scale: 1.5,
           duration: 800,
           delay: 1500,
           ease: 'Power2',
           onComplete: () => {
-            insultText.destroy();
+            motivationText.destroy();
           },
         });
       },
