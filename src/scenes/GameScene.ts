@@ -1126,8 +1126,8 @@ export class GameScene extends Phaser.Scene {
     const scoreAchievements = achievements.checkScore(this.score, this.previousHighScore);
     scoreAchievements.forEach(a => this.showAchievementPopup(a));
 
-    // Motivation every 10 points
-    if (this.score % 10 === 0) {
+    // Motivation every 10 pipes passed
+    if (this.score > 0 && this.score % 10 === 0) {
       this.showMotivation();
     }
   }
