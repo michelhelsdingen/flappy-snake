@@ -7,6 +7,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "server": "npx tsx server/index.ts",
+    "dev:all": "npx concurrently \"npm run server\" \"npm run dev\"",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -15,10 +17,18 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.0"
   }

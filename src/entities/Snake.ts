@@ -9,31 +9,28 @@ interface PositionRecord {
 export class Snake {
   private scene: Phaser.Scene;
   private head: Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body };
+  private avatarText: Phaser.GameObjects.Text | null = null;
   private segments: Phaser.GameObjects.Arc[] = [];
-  private eyes: Phaser.GameObjects.Arc[] = [];
   private positionHistory: PositionRecord[] = [];
   private segmentCount: number = 3;
+  private avatar: string;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, avatar: string = '🐍') {
     this.scene = scene;
+    this.avatar = avatar;
 
-    // Create head with physics
-    this.head = scene.add.circle(x, y, 15, COLORS.SNAKE) as Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body };
+    // Create head with physics (invisible circle for collision)
+    this.head = scene.add.circle(x, y, 15, COLORS.SNAKE, 0) as Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body };
     scene.physics.add.existing(this.head);
     this.head.body.setCircle(15);
     this.head.body.setCollideWorldBounds(false);
 
-    // Add glow effect
-    this.head.setStrokeStyle(4, COLORS.SNAKE_GLOW, 0.5);
-
-    // Add eyes
-    const eyeOffset = 6;
-    const eyeSize = 4;
-    const leftEye = scene.add.circle(x + eyeOffset, y - 5, eyeSize, 0xffffff);
-    const rightEye = scene.add.circle(x + eyeOffset, y + 5, eyeSize, 0xffffff);
-    const leftPupil = scene.add.circle(x + eyeOffset + 2, y - 5, 2, 0x000000);
-    const rightPupil = scene.add.circle(x + eyeOffset + 2, y + 5, 2, 0x000000);
-    this.eyes = [leftEye, rightEye, leftPupil, rightPupil];
+    // Add avatar emoji as head visual
+    this.avatarText = scene.add.text(x, y, avatar, {
+      fontSize: '32px',
+    });
+    this.avatarText.setOrigin(0.5);
+    this.avatarText.setDepth(10);
 
     // Create initial segments
     for (let i = 0; i < this.segmentCount; i++) {
@@ -78,13 +75,15 @@ export class Snake {
       }
     }
 
-    // Update eyes position
-    this.eyes.forEach((eye, i) => {
-      const offsetX = i < 2 ? 6 : 8;
-      const offsetY = i % 2 === 0 ? -5 : 5;
-      eye.x = this.head.x + offsetX;
-      eye.y = this.head.y + offsetY;
-    });
+    // Update avatar position to follow head
+    if (this.avatarText) {
+      this.avatarText.x = this.head.x;
+      this.avatarText.y = this.head.y;
+
+      // Tilt based on velocity
+      const velocity = this.head.body.velocity.y;
+      this.avatarText.setRotation(velocity * 0.002);
+    }
   }
 
   getHead(): Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body } {
@@ -98,6 +97,8 @@ export class Snake {
   destroy(): void {
     this.head.destroy();
     this.segments.forEach(s => s.destroy());
-    this.eyes.forEach(e => e.destroy());
+    if (this.avatarText) {
+      this.avatarText.destroy();
+    }
   }
 }
