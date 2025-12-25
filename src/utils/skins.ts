@@ -146,6 +146,17 @@ export const SKINS: Skin[] = [
     glowColor: 0xff00ff,
     trailColor: 0x00ffff,
   },
+  // Special skins
+  {
+    id: 'nyancat',
+    emoji: '🐱',
+    name: 'Nyan Cat',
+    description: 'Nyanyanyanya~',
+    unlockRequirement: 'Score 75+ in a single game',
+    unlockCondition: (stats) => stats.highScore >= 75,
+    glowColor: 0xff77ff,
+    trailColor: 0x00ffff,
+  },
 ];
 
 class SkinManager {
