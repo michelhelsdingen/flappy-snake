@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { GAME } from '../utils/constants';
 import { soundManager } from '../utils/sounds';
-import { getLeaderboard, initLeaderboard } from '../utils/leaderboard';
+import { getLeaderboard, initLeaderboard, subscribeLiveUpdates, LeaderboardEntry } from '../utils/leaderboard';
+import { skinManager, SKINS, Skin } from '../utils/skins';
 import { version } from '../../package.json';
 
+// Legacy avatars for backwards compatibility
 const AVATARS = ['🎅', '🎄', '⛄', '🦌', '🎁', '❄️', '🔔', '⭐', '🕯️', '🧦'];
 
 export class MenuScene extends Phaser.Scene {
@@ -12,6 +14,11 @@ export class MenuScene extends Phaser.Scene {
   private nameInput!: HTMLInputElement;
   private avatarTexts: Phaser.GameObjects.Text[] = [];
   private selectedAvatarIndex: number = 0;
+  private skinTexts: Phaser.GameObjects.Text[] = [];
+  private selectedSkinId: string = 'santa';
+  private skinTooltip: Phaser.GameObjects.Container | null = null;
+  private leaderboardContainer: Phaser.GameObjects.Container | null = null;
+  private unsubscribeLiveUpdates: (() => void) | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -19,7 +26,18 @@ export class MenuScene extends Phaser.Scene {
 
   async create(): Promise<void> {
     this.playerName = localStorage.getItem('flappySnakePlayerName') || '';
-    this.playerAvatar = localStorage.getItem('flappySnakeAvatar') || '🎅';
+
+    // Load selected skin
+    const selectedSkin = skinManager.getSelectedSkin();
+    this.selectedSkinId = selectedSkin.id;
+    this.playerAvatar = selectedSkin.emoji;
+
+    // Backwards compatibility with old avatar system
+    const legacyAvatar = localStorage.getItem('flappySnakeAvatar');
+    if (legacyAvatar && !SKINS.find(s => s.emoji === legacyAvatar)) {
+      this.playerAvatar = legacyAvatar;
+    }
+
     this.selectedAvatarIndex = AVATARS.indexOf(this.playerAvatar);
     if (this.selectedAvatarIndex === -1) this.selectedAvatarIndex = 0;
 
@@ -69,8 +87,8 @@ export class MenuScene extends Phaser.Scene {
     title.setOrigin(0.5);
     title.setShadow(0, 0, '#00ff00', 15, true, true);
 
-    // Avatar selection
-    this.createAvatarSelector();
+    // Skins selection (replaces old avatar selector)
+    this.createSkinSelector();
 
     // Name input label
     this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 - 30, 'ENTER YOUR NAME:', {
@@ -124,67 +142,146 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private createAvatarSelector(): void {
+  private createSkinSelector(): void {
     const y = GAME.HEIGHT / 2 - 80;
-    const startX = GAME.WIDTH / 2 - (AVATARS.length * 28) / 2;
+    const allSkins = skinManager.getAllSkins();
 
-    this.add.text(GAME.WIDTH / 2, y - 25, 'CHOOSE YOUR AVATAR:', {
+    // Show first 8 skins in first row, rest in second row
+    const skinsPerRow = 6;
+    const skinSize = 32;
+    const spacing = 38;
+
+    this.add.text(GAME.WIDTH / 2, y - 35, 'CHOOSE YOUR SKIN:', {
       fontSize: '14px',
       fontFamily: 'Arial',
       color: '#888888',
     }).setOrigin(0.5);
 
-    this.avatarTexts = [];
+    this.skinTexts = [];
 
-    AVATARS.forEach((avatar, index) => {
-      const x = startX + index * 28;
-      const avatarText = this.add.text(x, y, avatar, {
+    allSkins.forEach((item, index) => {
+      const row = Math.floor(index / skinsPerRow);
+      const col = index % skinsPerRow;
+      const rowWidth = Math.min(skinsPerRow, allSkins.length - row * skinsPerRow) * spacing;
+      const startX = GAME.WIDTH / 2 - rowWidth / 2 + spacing / 2;
+      const x = startX + col * spacing;
+      const skinY = y + row * 40;
+
+      const skinText = this.add.text(x, skinY, item.skin.emoji, {
         fontSize: '24px',
       });
-      avatarText.setOrigin(0.5);
-      avatarText.setInteractive({ useHandCursor: true });
+      skinText.setOrigin(0.5);
 
-      if (index === this.selectedAvatarIndex) {
-        avatarText.setScale(1.3);
+      if (item.unlocked) {
+        skinText.setInteractive({ useHandCursor: true });
+
+        if (item.skin.id === this.selectedSkinId) {
+          skinText.setScale(1.3);
+        } else {
+          skinText.setAlpha(0.6);
+        }
+
+        skinText.on('pointerdown', () => {
+          this.selectSkin(item.skin, index);
+        });
+
+        skinText.on('pointerover', () => {
+          if (item.skin.id !== this.selectedSkinId) {
+            skinText.setAlpha(0.9);
+          }
+          this.showSkinTooltip(item.skin, x, skinY, true);
+        });
+
+        skinText.on('pointerout', () => {
+          if (item.skin.id !== this.selectedSkinId) {
+            skinText.setAlpha(0.6);
+          }
+          this.hideSkinTooltip();
+        });
       } else {
-        avatarText.setAlpha(0.5);
+        // Locked skin - show as greyed out with lock
+        skinText.setAlpha(0.3);
+        skinText.setTint(0x444444);
+
+        skinText.setInteractive({ useHandCursor: true });
+        skinText.on('pointerover', () => {
+          this.showSkinTooltip(item.skin, x, skinY, false);
+        });
+        skinText.on('pointerout', () => {
+          this.hideSkinTooltip();
+        });
       }
 
-      avatarText.on('pointerdown', () => {
-        this.selectAvatar(index);
-      });
-
-      avatarText.on('pointerover', () => {
-        if (index !== this.selectedAvatarIndex) {
-          avatarText.setAlpha(0.8);
-        }
-      });
-
-      avatarText.on('pointerout', () => {
-        if (index !== this.selectedAvatarIndex) {
-          avatarText.setAlpha(0.5);
-        }
-      });
-
-      this.avatarTexts.push(avatarText);
+      this.skinTexts.push(skinText);
     });
   }
 
-  private selectAvatar(index: number): void {
-    // Deselect previous
-    if (this.avatarTexts[this.selectedAvatarIndex]) {
-      this.avatarTexts[this.selectedAvatarIndex].setScale(1);
-      this.avatarTexts[this.selectedAvatarIndex].setAlpha(0.5);
-    }
+  private selectSkin(skin: Skin, index: number): void {
+    // Deselect all
+    this.skinTexts.forEach((text, i) => {
+      const allSkins = skinManager.getAllSkins();
+      if (allSkins[i].unlocked) {
+        text.setScale(1);
+        text.setAlpha(0.6);
+      }
+    });
 
     // Select new
-    this.selectedAvatarIndex = index;
-    this.playerAvatar = AVATARS[index];
-    this.avatarTexts[index].setScale(1.3);
-    this.avatarTexts[index].setAlpha(1);
+    this.selectedSkinId = skin.id;
+    this.playerAvatar = skin.emoji;
+    skinManager.selectSkin(skin.id);
+    this.skinTexts[index].setScale(1.3);
+    this.skinTexts[index].setAlpha(1);
 
     // Play sound
     soundManager.playScore();
+  }
+
+  private showSkinTooltip(skin: Skin, x: number, y: number, unlocked: boolean): void {
+    this.hideSkinTooltip();
+
+    const container = this.add.container(x, y + 45);
+    container.setDepth(100);
+
+    const bg = this.add.rectangle(0, 0, 180, 50, 0x1a1a3e, 0.95);
+    bg.setStrokeStyle(1, unlocked ? 0x00ff00 : 0xff0000);
+
+    const nameText = this.add.text(0, -12, skin.name, {
+      fontSize: '12px',
+      fontFamily: 'Arial Black',
+      color: unlocked ? '#00ff00' : '#ff6666',
+    });
+    nameText.setOrigin(0.5);
+
+    const descText = this.add.text(0, 6, unlocked ? skin.description : `🔒 ${skin.unlockRequirement}`, {
+      fontSize: '10px',
+      fontFamily: 'Arial',
+      color: unlocked ? '#ffffff' : '#888888',
+    });
+    descText.setOrigin(0.5);
+
+    container.add([bg, nameText, descText]);
+    this.skinTooltip = container;
+  }
+
+  private hideSkinTooltip(): void {
+    if (this.skinTooltip) {
+      this.skinTooltip.destroy();
+      this.skinTooltip = null;
+    }
+  }
+
+  // Legacy method for backwards compatibility
+  private createAvatarSelector(): void {
+    this.createSkinSelector();
+  }
+
+  private selectAvatar(index: number): void {
+    // Legacy - redirect to skin selection
+    const allSkins = skinManager.getAllSkins();
+    if (allSkins[index] && allSkins[index].unlocked) {
+      this.selectSkin(allSkins[index].skin, index);
+    }
   }
 
   private createNameInput(): void {
@@ -240,17 +337,47 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private showLeaderboard(): void {
-    const leaderboard = getLeaderboard();
+    this.renderLeaderboard(getLeaderboard());
+
+    // Subscribe to live updates
+    this.unsubscribeLiveUpdates = subscribeLiveUpdates((entries) => {
+      this.renderLeaderboard(entries);
+    });
+  }
+
+  private renderLeaderboard(leaderboard: LeaderboardEntry[]): void {
+    // Clear existing leaderboard
+    if (this.leaderboardContainer) {
+      this.leaderboardContainer.destroy();
+    }
+
+    this.leaderboardContainer = this.add.container(0, 0);
+
     if (leaderboard.length === 0) return;
 
     // Leaderboard title with Christmas style
-    const lbTitle = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 140, '🎄 TOP SCORES 🎄', {
+    const lbTitle = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 140, '🎄 LIVE SCORES 🎄', {
       fontSize: '14px',
       fontFamily: 'Arial Black, Arial',
       color: '#ff3333',
     });
     lbTitle.setOrigin(0.5);
     lbTitle.setShadow(0, 0, '#00ff00', 5, true, true);
+    this.leaderboardContainer.add(lbTitle);
+
+    // Live indicator
+    const liveIndicator = this.add.circle(GAME.WIDTH / 2 + 80, GAME.HEIGHT / 2 + 140, 4, 0x00ff00);
+    this.leaderboardContainer.add(liveIndicator);
+
+    // Pulse animation for live indicator
+    this.tweens.add({
+      targets: liveIndicator,
+      alpha: 0.3,
+      scale: 1.3,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
 
     // Show top 5 scores
     const top5 = leaderboard.slice(0, 5);
@@ -262,6 +389,7 @@ export class MenuScene extends Phaser.Scene {
         fontSize: '14px',
       });
       avatarText.setOrigin(0.5, 0.5);
+      this.leaderboardContainer!.add(avatarText);
 
       const rankText = this.add.text(GAME.WIDTH / 2 - 80, y, `${index + 1}.`, {
         fontSize: '14px',
@@ -269,6 +397,7 @@ export class MenuScene extends Phaser.Scene {
         color: index === 0 ? '#ffd700' : '#888888',
       });
       rankText.setOrigin(0, 0.5);
+      this.leaderboardContainer!.add(rankText);
 
       const nameText = this.add.text(GAME.WIDTH / 2 - 60, y, entry.name, {
         fontSize: '14px',
@@ -276,6 +405,7 @@ export class MenuScene extends Phaser.Scene {
         color: index === 0 ? '#ffd700' : '#ffffff',
       });
       nameText.setOrigin(0, 0.5);
+      this.leaderboardContainer!.add(nameText);
 
       const scoreText = this.add.text(GAME.WIDTH / 2 + 80, y, entry.score.toString(), {
         fontSize: '14px',
@@ -283,6 +413,7 @@ export class MenuScene extends Phaser.Scene {
         color: index === 0 ? '#ffd700' : '#00ff00',
       });
       scoreText.setOrigin(1, 0.5);
+      this.leaderboardContainer!.add(scoreText);
     });
   }
 
@@ -290,6 +421,12 @@ export class MenuScene extends Phaser.Scene {
     const name = this.nameInput.value.trim().toUpperCase() || 'SPELER';
     localStorage.setItem('flappySnakePlayerName', name);
     localStorage.setItem('flappySnakeAvatar', this.playerAvatar);
+
+    // Unsubscribe from live updates
+    if (this.unsubscribeLiveUpdates) {
+      this.unsubscribeLiveUpdates();
+      this.unsubscribeLiveUpdates = null;
+    }
 
     soundManager.resume();
     this.nameInput.remove();

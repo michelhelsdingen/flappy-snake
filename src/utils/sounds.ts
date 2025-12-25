@@ -3,6 +3,11 @@ export class SoundManager {
   private context: AudioContext | null = null;
   private enabled: boolean = true;
   private unlocked: boolean = false;
+  private musicEnabled: boolean = true;
+  private currentMusicTier: number = -1;
+  private musicOscillators: OscillatorNode[] = [];
+  private musicGains: GainNode[] = [];
+  private musicInterval: number | null = null;
 
   private getContext(): AudioContext {
     if (!this.context) {
@@ -145,6 +150,87 @@ export class SoundManager {
   toggle(): boolean {
     this.enabled = !this.enabled;
     return this.enabled;
+  }
+
+  toggleMusic(): boolean {
+    this.musicEnabled = !this.musicEnabled;
+    if (!this.musicEnabled) {
+      this.stopMusic();
+    }
+    return this.musicEnabled;
+  }
+
+  // Background music that changes based on score tier
+  startMusic(tier: number = 0): void {
+    if (!this.musicEnabled || !this.enabled) return;
+    if (tier === this.currentMusicTier) return;
+
+    this.stopMusic();
+    this.currentMusicTier = tier;
+
+    const ctx = this.getContext();
+
+    // Different musical patterns for each tier
+    const tierConfigs = [
+      // Tier 0: Calm, slow (score 0-9)
+      { tempo: 400, notes: [262, 294, 330, 294], volume: 0.03 },
+      // Tier 1: Upbeat (score 10-24)
+      { tempo: 300, notes: [330, 392, 440, 392, 330, 294], volume: 0.04 },
+      // Tier 2: Energetic (score 25-49)
+      { tempo: 200, notes: [440, 523, 587, 523, 440, 392, 349, 392], volume: 0.05 },
+      // Tier 3: Intense (score 50+)
+      { tempo: 150, notes: [523, 659, 784, 659, 523, 587, 659, 587], volume: 0.06 },
+    ];
+
+    const config = tierConfigs[Math.min(tier, tierConfigs.length - 1)];
+    let noteIndex = 0;
+
+    const playNote = () => {
+      if (!this.musicEnabled || this.currentMusicTier !== tier) return;
+
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.type = 'sine';
+      const freq = config.notes[noteIndex % config.notes.length];
+      oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      gainNode.gain.setValueAtTime(config.volume, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (config.tempo / 1000) * 0.9);
+
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + (config.tempo / 1000));
+
+      noteIndex++;
+    };
+
+    // Play first note immediately
+    playNote();
+
+    // Schedule subsequent notes
+    this.musicInterval = window.setInterval(playNote, config.tempo);
+  }
+
+  updateMusicTier(score: number): void {
+    let tier = 0;
+    if (score >= 50) tier = 3;
+    else if (score >= 25) tier = 2;
+    else if (score >= 10) tier = 1;
+
+    if (tier !== this.currentMusicTier) {
+      this.startMusic(tier);
+    }
+  }
+
+  stopMusic(): void {
+    if (this.musicInterval) {
+      clearInterval(this.musicInterval);
+      this.musicInterval = null;
+    }
+    this.currentMusicTier = -1;
   }
 }
 

@@ -9,6 +9,7 @@ import { soundManager } from '../utils/sounds';
 import { haptics } from '../utils/haptics';
 import { achievements, Achievement } from '../utils/achievements';
 import { addScore, getLeaderboard, getHighScore, fetchLeaderboard } from '../utils/leaderboard';
+import { skinManager } from '../utils/skins';
 
 export class GameScene extends Phaser.Scene {
   private score: number = 0;
@@ -48,6 +49,9 @@ export class GameScene extends Phaser.Scene {
   private comboCount: number = 0;
   private comboTimer: Phaser.Time.TimerEvent | null = null;
   private readonly RAINBOW_COMBO_THRESHOLD: number = 5;
+
+  // Stats tracking for skin unlocks
+  private powerUpsCollected: number = 0;
 
   private readonly motivationTemplates: string[] = [
     'BIJNA {NAME}! VOLGENDE KEER BETER!',
@@ -100,6 +104,7 @@ export class GameScene extends Phaser.Scene {
     this.isGhostMode = false;
     this.comboCount = 0;
     this.comboTimer = null;
+    this.powerUpsCollected = 0;
     this.currentScrollSpeed = PHYSICS.SCROLL_SPEED;
     this.startTime = Date.now();
     this.previousHighScore = getHighScore();
@@ -113,6 +118,9 @@ export class GameScene extends Phaser.Scene {
 
     // Start achievement session
     achievements.startSession();
+
+    // Start background music
+    soundManager.startMusic(0);
 
     // Create layered background
     this.createBackground();
@@ -630,6 +638,7 @@ export class GameScene extends Phaser.Scene {
   private activatePowerUp(type: PowerUpType, duration: number): void {
     haptics.heavyImpact();
     soundManager.playScore(); // Use score sound for now
+    this.powerUpsCollected++;
 
     // Show power-up text
     const powerUpNames: Record<PowerUpType, string> = {
@@ -997,13 +1006,24 @@ export class GameScene extends Phaser.Scene {
     // Flash effect
     this.cameras.main.flash(100, 255, 0, 100);
 
-    // Death sound and haptics
+    // Stop music, death sound and haptics
+    soundManager.stopMusic();
     soundManager.playDeath();
     haptics.error();
 
     // Check minimalist achievement
     const minimalistAchievements = achievements.checkMinimalist(this.score, this.coins);
     minimalistAchievements.forEach(a => this.showAchievementPopup(a));
+
+    // Update skin unlock stats
+    const achievementStats = achievements.getUnlockedCount();
+    skinManager.updateStats({
+      highScore: this.score,
+      totalGames: 1,
+      totalCoins: this.coins,
+      totalPowerUps: this.powerUpsCollected,
+      achievementsUnlocked: achievementStats.unlocked,
+    });
 
     // Add score to leaderboard and get rank
     const rank = this.score > 0 ? addScore(this.playerName, this.score, this.playerAvatar) : 0;
@@ -1264,6 +1284,9 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(100, () => {
       this.scoreText.setColor('#ffffff');
     });
+
+    // Update music tier based on score
+    soundManager.updateMusicTier(this.score);
 
     // Check achievements
     const scoreAchievements = achievements.checkScore(this.score, this.previousHighScore);

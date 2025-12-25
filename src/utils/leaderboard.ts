@@ -91,3 +91,41 @@ export async function fetchHighScore(): Promise<number> {
 export async function initLeaderboard(): Promise<void> {
   await fetchLeaderboard();
 }
+
+// Live update callbacks
+type LeaderboardCallback = (entries: LeaderboardEntry[]) => void;
+let liveUpdateCallbacks: LeaderboardCallback[] = [];
+let liveUpdateInterval: number | null = null;
+
+// Subscribe to live leaderboard updates
+export function subscribeLiveUpdates(callback: LeaderboardCallback): () => void {
+  liveUpdateCallbacks.push(callback);
+
+  // Start polling if not already running
+  if (!liveUpdateInterval) {
+    liveUpdateInterval = window.setInterval(async () => {
+      if (liveUpdateCallbacks.length > 0) {
+        await fetchLeaderboard();
+        liveUpdateCallbacks.forEach(cb => cb(cachedLeaderboard));
+      }
+    }, 10000); // Poll every 10 seconds
+  }
+
+  // Return unsubscribe function
+  return () => {
+    liveUpdateCallbacks = liveUpdateCallbacks.filter(cb => cb !== callback);
+    if (liveUpdateCallbacks.length === 0 && liveUpdateInterval) {
+      clearInterval(liveUpdateInterval);
+      liveUpdateInterval = null;
+    }
+  };
+}
+
+// Stop all live updates
+export function stopLiveUpdates(): void {
+  if (liveUpdateInterval) {
+    clearInterval(liveUpdateInterval);
+    liveUpdateInterval = null;
+  }
+  liveUpdateCallbacks = [];
+}
