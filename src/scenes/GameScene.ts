@@ -39,9 +39,15 @@ export class GameScene extends Phaser.Scene {
   private isInvincible: boolean = false;
   private isSlowMo: boolean = false;
   private hasMagnet: boolean = false;
+  private isGhostMode: boolean = false;
   private magnetRange: number = 150;
   private powerUpIndicators: Map<PowerUpType, Phaser.GameObjects.Container> = new Map();
   private currentScrollSpeed: number = PHYSICS.SCROLL_SPEED;
+
+  // Combo tracking for rainbow mode
+  private comboCount: number = 0;
+  private comboTimer: Phaser.Time.TimerEvent | null = null;
+  private readonly RAINBOW_COMBO_THRESHOLD: number = 5;
 
   private readonly motivationTemplates: string[] = [
     'BIJNA {NAME}! VOLGENDE KEER BETER!',
@@ -91,6 +97,9 @@ export class GameScene extends Phaser.Scene {
     this.isInvincible = false;
     this.isSlowMo = false;
     this.hasMagnet = false;
+    this.isGhostMode = false;
+    this.comboCount = 0;
+    this.comboTimer = null;
     this.currentScrollSpeed = PHYSICS.SCROLL_SPEED;
     this.startTime = Date.now();
     this.previousHighScore = getHighScore();
@@ -358,7 +367,7 @@ export class GameScene extends Phaser.Scene {
     const x = GAME.WIDTH + 30;
     const y = Phaser.Math.Between(100, GAME.HEIGHT - 100);
 
-    const types: PowerUpType[] = ['shield', 'slowmo', 'magnet'];
+    const types: PowerUpType[] = ['shield', 'slowmo', 'magnet', 'ghost'];
     const type = Phaser.Math.RND.pick(types);
 
     const powerUp = new PowerUp(this, x, y, type);
@@ -436,10 +445,11 @@ export class GameScene extends Phaser.Scene {
       const pipe = this.pipes[i];
       pipe.update(this.currentScrollSpeed);
 
-      // Check collision with pipes
+      // Check collision with pipes (ghost mode passes through)
       if (
-        this.physics.overlap(hitbox, pipe.getTopPipe()) ||
-        this.physics.overlap(hitbox, pipe.getBottomPipe())
+        !this.isGhostMode &&
+        (this.physics.overlap(hitbox, pipe.getTopPipe()) ||
+        this.physics.overlap(hitbox, pipe.getBottomPipe()))
       ) {
         if (this.isInvincible) {
           // Still invincible from shield break, ignore collision
@@ -626,6 +636,7 @@ export class GameScene extends Phaser.Scene {
       shield: '🛡️ SHIELD!',
       slowmo: '⏱️ SLOW-MO!',
       magnet: '🧲 MAGNET!',
+      ghost: '👻 GHOST!',
     };
 
     const text = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 - 50, powerUpNames[type], {
@@ -665,6 +676,9 @@ export class GameScene extends Phaser.Scene {
       case 'magnet':
         this.activateMagnet(duration);
         break;
+      case 'ghost':
+        this.activateGhost(duration);
+        break;
     }
   }
 
@@ -677,6 +691,7 @@ export class GameScene extends Phaser.Scene {
       shield: '🛡️',
       slowmo: '⏱️',
       magnet: '🧲',
+      ghost: '👻',
     };
 
     const y = 50 + this.powerUpIndicators.size * 35;
@@ -818,6 +833,94 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private activateGhost(duration: number): void {
+    this.isGhostMode = true;
+    this.player.enableGhostMode();
+
+    // Screen effect - ghostly overlay
+    const ghostOverlay = this.add.rectangle(
+      GAME.WIDTH / 2, GAME.HEIGHT / 2,
+      GAME.WIDTH, GAME.HEIGHT,
+      0xaaaaff, 0.1
+    );
+    ghostOverlay.setDepth(45);
+
+    // Deactivate after duration
+    this.time.delayedCall(duration, () => {
+      this.isGhostMode = false;
+      this.player.disableGhostMode();
+      ghostOverlay.destroy();
+    });
+  }
+
+  private createConfettiExplosion(): void {
+    const confettiEmojis = ['🎉', '🎊', '✨', '🌟', '⭐', '💫', '🏆', '👑'];
+    const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffd700];
+
+    // Create 50 confetti pieces from multiple positions
+    for (let i = 0; i < 50; i++) {
+      const startX = Phaser.Math.Between(50, GAME.WIDTH - 50);
+      const startY = -20;
+      const emoji = Phaser.Math.RND.pick(confettiEmojis);
+
+      const confetti = this.add.text(startX, startY, emoji, {
+        fontSize: `${Phaser.Math.Between(16, 28)}px`,
+      });
+      confetti.setDepth(300);
+      confetti.setAlpha(0);
+
+      // Stagger the animations
+      this.time.delayedCall(i * 30, () => {
+        confetti.setAlpha(1);
+
+        // Fall with rotation and horizontal drift
+        this.tweens.add({
+          targets: confetti,
+          x: confetti.x + Phaser.Math.Between(-100, 100),
+          y: GAME.HEIGHT + 50,
+          rotation: Phaser.Math.FloatBetween(-Math.PI * 2, Math.PI * 2),
+          alpha: { from: 1, to: 0.3 },
+          duration: Phaser.Math.Between(2000, 3500),
+          ease: 'Sine.easeIn',
+          onComplete: () => confetti.destroy(),
+        });
+      });
+    }
+
+    // Create particle bursts at corners
+    const burstPositions = [
+      { x: 50, y: 100 },
+      { x: GAME.WIDTH - 50, y: 100 },
+      { x: GAME.WIDTH / 2, y: 50 },
+    ];
+
+    burstPositions.forEach((pos, index) => {
+      this.time.delayedCall(index * 200, () => {
+        // Create colorful particle burst
+        for (let j = 0; j < 15; j++) {
+          const angle = (j / 15) * Math.PI * 2;
+          const speed = Phaser.Math.Between(100, 200);
+          const particle = this.add.circle(pos.x, pos.y, 5, Phaser.Math.RND.pick(colors));
+          particle.setDepth(299);
+
+          this.tweens.add({
+            targets: particle,
+            x: pos.x + Math.cos(angle) * speed,
+            y: pos.y + Math.sin(angle) * speed + 100,
+            alpha: 0,
+            scale: 0,
+            duration: 1000,
+            ease: 'Quad.easeOut',
+            onComplete: () => particle.destroy(),
+          });
+        }
+      });
+    });
+
+    // Camera celebration flash
+    this.cameras.main.flash(200, 255, 215, 0, true);
+  }
+
   private showAchievementPopup(achievement: Achievement): void {
     haptics.achievement();
 
@@ -908,6 +1011,7 @@ export class GameScene extends Phaser.Scene {
 
     if (isNewBest && this.score > this.previousHighScore) {
       haptics.celebration();
+      this.createConfettiExplosion();
     }
 
     // Wait for leaderboard to update
@@ -1105,6 +1209,45 @@ export class GameScene extends Phaser.Scene {
     // Score sound and haptics
     soundManager.playScore();
     haptics.success();
+
+    // Combo tracking for rainbow mode
+    this.comboCount++;
+    if (this.comboTimer) {
+      this.comboTimer.destroy();
+    }
+    // Reset combo after 3 seconds of no scoring
+    this.comboTimer = this.time.delayedCall(3000, () => {
+      this.comboCount = 0;
+      this.player.disableRainbowMode();
+    });
+
+    // Enable rainbow mode at high combo
+    if (this.comboCount >= this.RAINBOW_COMBO_THRESHOLD) {
+      this.player.enableRainbowMode();
+
+      // Show rainbow notification on first activation
+      if (this.comboCount === this.RAINBOW_COMBO_THRESHOLD) {
+        const rainbowText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, '🌈 RAINBOW MODE! 🌈', {
+          fontSize: '24px',
+          fontFamily: 'Arial Black, Arial',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 4,
+        });
+        rainbowText.setOrigin(0.5);
+        rainbowText.setDepth(200);
+
+        this.tweens.add({
+          targets: rainbowText,
+          y: rainbowText.y - 50,
+          alpha: 0,
+          scale: 1.5,
+          duration: 1000,
+          ease: 'Quad.easeOut',
+          onComplete: () => rainbowText.destroy(),
+        });
+      }
+    }
 
     // Score flash effect
     this.tweens.add({

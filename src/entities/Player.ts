@@ -1,5 +1,17 @@
 import Phaser from 'phaser';
-import { PHYSICS } from '../utils/constants';
+import { PHYSICS, GAME } from '../utils/constants';
+
+// Funny death messages
+const DEATH_MESSAGES = [
+  '💀 OEPS!',
+  '🤡 FAIL!',
+  '😵 BONK!',
+  '🪦 RIP!',
+  '💥 BOOM!',
+  '🫠 SPLAT!',
+  '😱 NOOOO!',
+  '🤯 WASTED!',
+];
 
 export class Player {
   private scene: Phaser.Scene;
@@ -8,9 +20,15 @@ export class Player {
   private glowCircle: Phaser.GameObjects.Arc;
   private trail: Phaser.GameObjects.Particles.ParticleEmitter;
   private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter;
+  private rainbowTrail: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private isRainbowMode: boolean = false;
+  private isGhostMode: boolean = false;
+  private ghostOverlay: Phaser.GameObjects.Arc | null = null;
+  private originalEmoji: string;
 
   constructor(scene: Phaser.Scene, x: number, y: number, emoji: string = '🐍') {
     this.scene = scene;
+    this.originalEmoji = emoji;
 
     // Create hitbox with physics - EXACTLY like Snake class
     this.hitbox = scene.add.circle(x, y, 16, 0xffffff, 0) as Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body };
@@ -78,6 +96,13 @@ export class Player {
       followOffset: { x: -20, y: 0 },
     });
     this.trailParticles.setDepth(1);
+
+    // Create rainbow particle texture
+    const rainbowGraphics = scene.make.graphics({ x: 0, y: 0 });
+    rainbowGraphics.fillStyle(0xffffff, 1);
+    rainbowGraphics.fillCircle(6, 6, 6);
+    rainbowGraphics.generateTexture('rainbow', 12, 12);
+    rainbowGraphics.destroy();
   }
 
   flap(): void {
@@ -97,6 +122,11 @@ export class Player {
     if (this.trail) {
       this.trail.explode(5, this.hitbox.x - 10, this.hitbox.y);
     }
+
+    // Rainbow burst if in rainbow mode
+    if (this.isRainbowMode && this.rainbowTrail) {
+      this.rainbowTrail.explode(8, this.hitbox.x - 10, this.hitbox.y);
+    }
   }
 
   update(): void {
@@ -107,6 +137,12 @@ export class Player {
     // Update glow position
     this.glowCircle.x = this.hitbox.x;
     this.glowCircle.y = this.hitbox.y;
+
+    // Update ghost overlay position
+    if (this.ghostOverlay) {
+      this.ghostOverlay.x = this.hitbox.x;
+      this.ghostOverlay.y = this.hitbox.y;
+    }
 
     // Tilt based on velocity
     const velocity = this.hitbox.body.velocity.y;
@@ -122,20 +158,159 @@ export class Player {
     return this.hitbox.y;
   }
 
-  explode(): void {
-    // Death explosion effect
-    this.trail.explode(20, this.hitbox.x, this.hitbox.y);
-    this.trailParticles.explode(15, this.hitbox.x, this.hitbox.y);
+  // Enable rainbow trail for high combos
+  enableRainbowMode(): void {
+    if (this.isRainbowMode) return;
+    this.isRainbowMode = true;
 
-    // Shake avatar
+    this.rainbowTrail = this.scene.add.particles(this.hitbox.x, this.hitbox.y, 'rainbow', {
+      speed: { min: 20, max: 50 },
+      scale: { start: 0.6, end: 0 },
+      alpha: { start: 0.9, end: 0 },
+      lifespan: 400,
+      frequency: 20,
+      blendMode: 'ADD',
+      follow: this.hitbox,
+      followOffset: { x: -20, y: 0 },
+      tint: [0xff0000, 0xff7700, 0xffff00, 0x00ff00, 0x0077ff, 0x9900ff],
+    });
+    this.rainbowTrail.setDepth(2);
+
+    // Make glow rainbow too
+    this.scene.tweens.addCounter({
+      from: 0,
+      to: 360,
+      duration: 1000,
+      repeat: -1,
+      onUpdate: (tween) => {
+        const hue = tween.getValue() ?? 0;
+        const color = Phaser.Display.Color.HSLToColor(hue / 360, 1, 0.5);
+        this.glowCircle.setFillStyle(color.color, 0.4);
+      },
+    });
+  }
+
+  disableRainbowMode(): void {
+    if (!this.isRainbowMode) return;
+    this.isRainbowMode = false;
+
+    if (this.rainbowTrail) {
+      this.rainbowTrail.destroy();
+      this.rainbowTrail = null;
+    }
+
+    this.glowCircle.setFillStyle(0xff3333, 0.3);
+  }
+
+  // Ghost mode - can pass through pipes
+  enableGhostMode(): void {
+    if (this.isGhostMode) return;
+    this.isGhostMode = true;
+
+    // Make avatar semi-transparent and add ghost effect
+    this.avatar.setAlpha(0.6);
+
+    this.ghostOverlay = this.scene.add.circle(this.hitbox.x, this.hitbox.y, 30, 0xaaaaff, 0.3);
+    this.ghostOverlay.setDepth(19);
+
+    this.scene.tweens.add({
+      targets: this.ghostOverlay,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      alpha: 0.1,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Wobble effect
     this.scene.tweens.add({
       targets: this.avatar,
-      x: this.avatar.x + Phaser.Math.Between(-5, 5),
-      y: this.avatar.y + Phaser.Math.Between(-5, 5),
-      duration: 50,
-      repeat: 5,
+      scaleX: 1.1,
+      duration: 200,
       yoyo: true,
+      repeat: -1,
     });
+  }
+
+  disableGhostMode(): void {
+    if (!this.isGhostMode) return;
+    this.isGhostMode = false;
+
+    this.avatar.setAlpha(1);
+    this.scene.tweens.killTweensOf(this.avatar);
+    this.avatar.setScale(1);
+
+    if (this.ghostOverlay) {
+      this.ghostOverlay.destroy();
+      this.ghostOverlay = null;
+    }
+  }
+
+  isGhost(): boolean {
+    return this.isGhostMode;
+  }
+
+  explode(): void {
+    // Death explosion effect
+    this.trail.explode(30, this.hitbox.x, this.hitbox.y);
+    this.trailParticles.explode(20, this.hitbox.x, this.hitbox.y);
+
+    // Funny death message
+    const deathMsg = Phaser.Math.RND.pick(DEATH_MESSAGES);
+    const msgText = this.scene.add.text(this.hitbox.x, this.hitbox.y - 50, deathMsg, {
+      fontSize: '28px',
+      fontFamily: 'Arial Black, Arial',
+      color: '#ff0000',
+      stroke: '#000000',
+      strokeThickness: 4,
+    });
+    msgText.setOrigin(0.5);
+    msgText.setDepth(300);
+
+    this.scene.tweens.add({
+      targets: msgText,
+      y: msgText.y - 80,
+      alpha: 0,
+      scale: 1.5,
+      duration: 1000,
+      ease: 'Quad.easeOut',
+      onComplete: () => msgText.destroy(),
+    });
+
+    // Avatar spin and shrink death animation
+    this.scene.tweens.add({
+      targets: this.avatar,
+      rotation: Math.PI * 4,
+      scaleX: 0,
+      scaleY: 0,
+      duration: 600,
+      ease: 'Quad.easeIn',
+    });
+
+    // Explosion particles in all directions
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const particle = this.scene.add.text(
+        this.hitbox.x,
+        this.hitbox.y,
+        '✨',
+        { fontSize: '20px' }
+      );
+      particle.setOrigin(0.5);
+      particle.setDepth(250);
+
+      this.scene.tweens.add({
+        targets: particle,
+        x: this.hitbox.x + Math.cos(angle) * 100,
+        y: this.hitbox.y + Math.sin(angle) * 100,
+        alpha: 0,
+        rotation: Math.PI * 2,
+        duration: 500,
+        ease: 'Quad.easeOut',
+        onComplete: () => particle.destroy(),
+      });
+    }
   }
 
   destroy(): void {
@@ -144,5 +319,7 @@ export class Player {
     this.glowCircle.destroy();
     this.trail.destroy();
     this.trailParticles.destroy();
+    if (this.rainbowTrail) this.rainbowTrail.destroy();
+    if (this.ghostOverlay) this.ghostOverlay.destroy();
   }
 }
