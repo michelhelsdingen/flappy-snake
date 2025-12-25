@@ -1136,7 +1136,7 @@ export class GameScene extends Phaser.Scene {
     const template = Phaser.Math.RND.pick(this.motivationTemplates);
     const motivation = template.replace('{NAME}', this.playerName);
 
-    const motivationText = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, motivation, {
+    const motivationText = this.add.text(GAME.WIDTH / 2, 60, motivation, {
       fontSize: '24px',
       fontFamily: 'Arial Black, Arial',
       color: '#00ff88',
