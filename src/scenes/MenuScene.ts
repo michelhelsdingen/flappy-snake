@@ -153,9 +153,9 @@ export class MenuScene extends Phaser.Scene {
     const y = GAME.HEIGHT / 2 - 80;
     const allSkins = skinManager.getAllSkins();
 
-    // Show first 8 skins in first row, rest in second row
-    const skinsPerRow = 6;
-    const spacing = 38;
+    // Show 7 skins per row to fit all 13 skins in 2 rows
+    const skinsPerRow = 7;
+    const spacing = 34;
 
     this.add.text(GAME.WIDTH / 2, y - 35, 'CHOOSE YOUR SKIN:', {
       fontSize: '14px',
