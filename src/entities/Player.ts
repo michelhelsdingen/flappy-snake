@@ -17,7 +17,8 @@ const DEATH_MESSAGES = [
 export class Player {
   private scene: Phaser.Scene;
   private hitbox: Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body };
-  private avatar: Phaser.GameObjects.Text;
+  private avatar: Phaser.GameObjects.Text | null = null;
+  private avatarSprite: Phaser.GameObjects.Image | null = null;
   private glowCircle: Phaser.GameObjects.Arc;
   private trail: Phaser.GameObjects.Particles.ParticleEmitter;
   private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -54,12 +55,24 @@ export class Player {
       ease: 'Sine.easeInOut',
     });
 
-    // Avatar emoji - larger and more prominent
-    this.avatar = scene.add.text(x, y, emoji, {
-      fontSize: '42px',
-    });
-    this.avatar.setOrigin(0.5);
-    this.avatar.setDepth(20);
+    // Check if Nyan Cat skin - use sprite instead of emoji
+    const selectedSkin = skinManager.getSelectedSkin();
+    this.isNyanCat = selectedSkin.id === 'nyancat';
+
+    if (this.isNyanCat && scene.textures.exists('nyancat')) {
+      // Use Nyan Cat sprite
+      this.avatarSprite = scene.add.image(x, y, 'nyancat');
+      this.avatarSprite.setScale(0.2); // Scale down the sprite
+      this.avatarSprite.setOrigin(0.5);
+      this.avatarSprite.setDepth(20);
+    } else {
+      // Avatar emoji - larger and more prominent
+      this.avatar = scene.add.text(x, y, emoji, {
+        fontSize: '42px',
+      });
+      this.avatar.setOrigin(0.5);
+      this.avatar.setDepth(20);
+    }
 
     // Create Christmas red particle texture
     const particleGraphics = scene.make.graphics({ x: 0, y: 0 });
@@ -106,10 +119,8 @@ export class Player {
     rainbowGraphics.generateTexture('rainbow', 12, 12);
     rainbowGraphics.destroy();
 
-    // Check if Nyan Cat skin - enable permanent rainbow trail
-    const selectedSkin = skinManager.getSelectedSkin();
-    if (selectedSkin.id === 'nyancat') {
-      this.isNyanCat = true;
+    // Enable Nyan Cat mode if selected (check already done above)
+    if (this.isNyanCat) {
       this.enableNyanCatMode();
     }
   }
@@ -137,14 +148,17 @@ export class Player {
     this.hitbox.body.setVelocityY(PHYSICS.FLAP_VELOCITY);
 
     // Flap animation - quick scale bounce
-    this.scene.tweens.add({
-      targets: this.avatar,
-      scaleX: 1.3,
-      scaleY: 0.8,
-      duration: 80,
-      yoyo: true,
-      ease: 'Quad.easeOut',
-    });
+    const target = this.avatarSprite || this.avatar;
+    if (target) {
+      this.scene.tweens.add({
+        targets: target,
+        scaleX: this.avatarSprite ? 0.26 : 1.3,
+        scaleY: this.avatarSprite ? 0.16 : 0.8,
+        duration: 80,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      });
+    }
 
     // Burst of particles on flap
     if (this.trail) {
@@ -159,8 +173,16 @@ export class Player {
 
   update(): void {
     // Update avatar position to follow hitbox
-    this.avatar.x = this.hitbox.x;
-    this.avatar.y = this.hitbox.y;
+    const visual = this.avatarSprite || this.avatar;
+    if (visual) {
+      visual.x = this.hitbox.x;
+      visual.y = this.hitbox.y;
+
+      // Tilt based on velocity
+      const velocity = this.hitbox.body.velocity.y;
+      const targetRotation = Phaser.Math.Clamp(velocity * 0.003, -0.5, 0.5);
+      visual.rotation = Phaser.Math.Linear(visual.rotation, targetRotation, 0.2);
+    }
 
     // Update glow position
     this.glowCircle.x = this.hitbox.x;
@@ -171,11 +193,6 @@ export class Player {
       this.ghostOverlay.x = this.hitbox.x;
       this.ghostOverlay.y = this.hitbox.y;
     }
-
-    // Tilt based on velocity
-    const velocity = this.hitbox.body.velocity.y;
-    const targetRotation = Phaser.Math.Clamp(velocity * 0.003, -0.5, 0.5);
-    this.avatar.rotation = Phaser.Math.Linear(this.avatar.rotation, targetRotation, 0.2);
   }
 
   getHitbox(): Phaser.GameObjects.Arc & { body: Phaser.Physics.Arcade.Body } {
@@ -242,7 +259,8 @@ export class Player {
     this.isGhostMode = true;
 
     // Make avatar semi-transparent and add ghost effect
-    this.avatar.setAlpha(0.6);
+    const visual = this.avatarSprite || this.avatar;
+    if (visual) visual.setAlpha(0.6);
 
     this.ghostOverlay = this.scene.add.circle(this.hitbox.x, this.hitbox.y, 30, 0xaaaaff, 0.3);
     this.ghostOverlay.setDepth(19);
@@ -258,22 +276,31 @@ export class Player {
     });
 
     // Wobble effect
-    this.scene.tweens.add({
-      targets: this.avatar,
-      scaleX: 1.1,
-      duration: 200,
-      yoyo: true,
-      repeat: -1,
-    });
+    if (visual) {
+      this.scene.tweens.add({
+        targets: visual,
+        scaleX: this.avatarSprite ? 0.22 : 1.1,
+        duration: 200,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
   }
 
   disableGhostMode(): void {
     if (!this.isGhostMode) return;
     this.isGhostMode = false;
 
-    this.avatar.setAlpha(1);
-    this.scene.tweens.killTweensOf(this.avatar);
-    this.avatar.setScale(1);
+    const visual = this.avatarSprite || this.avatar;
+    if (visual) {
+      visual.setAlpha(1);
+      this.scene.tweens.killTweensOf(visual);
+      if (this.avatarSprite) {
+        this.avatarSprite.setScale(0.2);
+      } else if (this.avatar) {
+        this.avatar.setScale(1);
+      }
+    }
 
     if (this.ghostOverlay) {
       this.ghostOverlay.destroy();
@@ -313,14 +340,17 @@ export class Player {
     });
 
     // Avatar spin and shrink death animation
-    this.scene.tweens.add({
-      targets: this.avatar,
-      rotation: Math.PI * 4,
-      scaleX: 0,
-      scaleY: 0,
-      duration: 600,
-      ease: 'Quad.easeIn',
-    });
+    const visual = this.avatarSprite || this.avatar;
+    if (visual) {
+      this.scene.tweens.add({
+        targets: visual,
+        rotation: Math.PI * 4,
+        scaleX: 0,
+        scaleY: 0,
+        duration: 600,
+        ease: 'Quad.easeIn',
+      });
+    }
 
     // Explosion particles in all directions
     for (let i = 0; i < 12; i++) {
@@ -349,7 +379,8 @@ export class Player {
 
   destroy(): void {
     this.hitbox.destroy();
-    this.avatar.destroy();
+    if (this.avatar) this.avatar.destroy();
+    if (this.avatarSprite) this.avatarSprite.destroy();
     this.glowCircle.destroy();
     this.trail.destroy();
     this.trailParticles.destroy();

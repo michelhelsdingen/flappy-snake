@@ -88,6 +88,13 @@ export class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
+  preload(): void {
+    // Load Nyan Cat sprite for the special skin
+    if (!this.textures.exists('nyancat')) {
+      this.load.image('nyancat', 'assets/nyancat.png');
+    }
+  }
+
   init(data: { playerName?: string; avatar?: string }): void {
     this.playerName = data.playerName || localStorage.getItem('flappySnakePlayerName') || 'SPELER';
     this.playerAvatar = data.avatar || localStorage.getItem('flappySnakeAvatar') || '🐍';
